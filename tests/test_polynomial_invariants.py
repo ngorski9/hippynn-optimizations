@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+from hippynn import settings
 from hippynn.layers.hiplayers.tensors import HopInvariantLayerTorch
 from hippynn.layers.hiplayers.invariants import HopInvariantLayer, compute_invariant_polynomial_collection
 
@@ -42,6 +43,42 @@ def test_polynomial_invariants():
 
                 assert torch.autograd.gradcheck(EvaluatePolynomials.apply, (tensor_features, polyCollection))
                 assert torch.autograd.gradgradcheck(EvaluatePolynomials.apply, (tensor_features, polyCollection))
+
+
+def test_parallel_polynomial_invariants():
+    try:
+        import triton.language as tl
+        triton_available = hasattr(tl, "gather")
+    except ImportError:
+        triton_available = False
+
+    if triton_available and torch.cuda.is_available():
+        from hippynn.custom_kernels.poly_triton import EvaluatePolynomials
+
+        torch.manual_seed(0)
+        tensor_features = torch.randn((3, 9), requires_grad=True, device="cuda")
+        poly_collection = compute_invariant_polynomial_collection(2, 2)
+        poly_collection.set_device("cuda")
+
+        previous_setting = settings.USE_PARALLEL_POLYNOMIAL_EVAL
+        settings.USE_PARALLEL_POLYNOMIAL_EVAL = True
+        try:
+            invars_poly = EvaluatePolynomials.apply(tensor_features, poly_collection)
+
+            torch_invariants = HopInvariantLayerTorch(2, 2).to("cuda")
+            invars_torch = torch_invariants(tensor_features)
+
+            assert torch.allclose(invars_poly, invars_torch, rtol=1e-4, atol=1e-4)
+
+            tensor_features = tensor_features.to(torch.float64)
+            assert torch.autograd.gradcheck(
+                EvaluatePolynomials.apply, (tensor_features, poly_collection)
+            )
+            assert torch.autograd.gradgradcheck(
+                EvaluatePolynomials.apply, (tensor_features, poly_collection)
+            )
+        finally:
+            settings.USE_PARALLEL_POLYNOMIAL_EVAL = previous_setting
 
 def test_invariants_wrapper():
 

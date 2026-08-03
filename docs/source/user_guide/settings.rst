@@ -85,6 +85,11 @@ The following settings are available:
      - true, false
      - true
      - yes
+   * - USE_PARALLEL_POLYNOMIAL_EVAL
+     - If True, use the experimental polynomial-parallel Triton evaluator. If False, use the original serial polynomial evaluator.
+     - true, false
+     - false
+     - yes
    * - USE_TENSOR_MESSAGE_PASSING
      - If True, evaluate the message passing step for HIP-HOP-NN and HIP-NN-TS by calling a single fused triton kernel that handles the entire message passing step (if triton and cuda are available).
      - true, false
